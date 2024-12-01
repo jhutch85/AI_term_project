@@ -1,6 +1,6 @@
 import json
 
-with open("./questions_corrected.json", 'r') as file:
+with open("./questions_corrected.json", "r") as file:
     data = json.load(file)
 
 

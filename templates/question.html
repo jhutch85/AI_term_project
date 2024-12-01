@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Question {{ question_number }}</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <script>
+        let startTime;
+
+        function toggleHint() {
+            var hint = document.getElementById('hint');
+            var hintUsed = document.getElementById('used_hint');
+            if (hint.style.display === 'none') {
+                hint.style.display = 'block';
+                hintUsed.value = 'true';
+            } else {
+                hint.style.display = 'none';
+                hintUsed.value = 'false';
+            }
+        }
+
+        window.onload = function() {
+            startTime = new Date();
+        }
+
+        function recordResponseTime() {
+            let endTime = new Date();
+            let responseTime = (endTime - startTime) / 1000; // in seconds
+            document.getElementById('response_time').value = responseTime.toFixed(2);
+        }
+    </script>
+</head>
+<body class="container mt-5">
+    <h2>Question {{ question_number }} of 10</h2>
+    <p>{{ question.question }}</p>
+    
+    <form id="answerForm" method="POST" action="{{ url_for('submit_answer') }}" onsubmit="recordResponseTime()">
+        <div class="form-group">
+            {% for option in options %}
+                <div class="form-check">
+                    <input class="form-check-input" type="radio" name="selected_answer" value="{{ option }}" required>
+                    <label class="form-check-label">{{ option }}</label>
+                </div>
+            {% endfor %}
+        </div>
+        <button type="button" class="btn btn-info mb-3" onclick="toggleHint()">Show/Hide Hint</button>
+        <div id="hint" style="display: none;" class="alert alert-warning">
+            <strong>Hint:</strong> {{ hint }}
+        </div>
+        <input type="hidden" name="question_id" value="{{ question.id }}">
+        <input type="hidden" name="used_hint" id="used_hint" value="false">
+        <input type="hidden" name="response_time" id="response_time" value="0">
+        <button type="submit" class="btn btn-primary">Submit Answer</button>
+    </form>
+</body>
+</html>
+

@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Answer Feedback</title>
+</head>
+<body>
+    <h2>Answer Feedback</h2>
+    <p><strong>Question:</strong> {{ question }}</p>
+    <p><strong>Your Answer:</strong> {{ selected_answer }}</p>
+    {% if is_correct %}
+        <p style="color: green;"><strong>Correct!</strong></p>
+    {% else %}
+        <p style="color: red;"><strong>Incorrect.</strong> The correct answer is {{ correct_answer }}.</p>
+    {% endif %}
+    <a href="{{ url_for('question') }}">Next Question</a>
+</body>
+</html>
+
