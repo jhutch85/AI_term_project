@@ -275,7 +275,7 @@ def predict_learning_style_helper(features):
             class_labels = [
                 "Self-guided",
                 "Tutor-assisted",
-                "Other",
+                "Balanced-Learner",
             ]
             learning_style = (
                 class_labels[predicted_class]
