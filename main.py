@@ -55,10 +55,9 @@ logger.info(f"Using model: {model_used}")
 
 # Initialize Flask app
 app = Flask(__name__)
-app.secret_key = os.environ.get(
-    "FLASK_SECRET_KEY", os.urandom(24))
+app.secret_key = os.environ.get("FLASK_SECRET_KEY", os.urandom(24))
 
-DATASET_PATH = "./questions_corrected.json"
+DATASET_PATH = "./questions_downsampled.json"
 
 questions = []
 
@@ -158,8 +157,7 @@ def load_questions():
 load_questions()
 
 
-# Function to generate multiple-choice questions (MCQs)
-def generate_mcq(correct_answer, question_text, num_options=4):
+def generate_mcq(correct_answer, question_text, num_options=4, max_attempts=10):
     """
     Generate multiple-choice options including the correct answer.
     Ensures the correct answer is included and distractors are plausible.
@@ -168,50 +166,85 @@ def generate_mcq(correct_answer, question_text, num_options=4):
     - correct_answer (str): The correct answer to the question.
     - question_text (str): The text of the question, used to generate context-specific distractors.
     - num_options (int): The total number of options to generate.
+    - max_attempts (int): Maximum attempts to generate unique distractors.
 
     Returns:
     - List[str]: A list of answer options shuffled randomly.
     """
     options = [correct_answer]
     distractors = set()
+    attempts = 0  # Initialize attempts in the outer function
 
     # Helper function to modify numeric values in the answer
     def modify_numbers_in_expression(expression, num_variations=3):
+        nonlocal attempts  # Declare 'attempts' as nonlocal to modify the outer variable
         matches = re.findall(r"-?\d+(?:\.\d+)?", expression)
         if not matches:
             return [expression]  # If no numeric component, return the original
 
         modified_expressions = set()
-        while len(modified_expressions) < num_variations:
+        while len(modified_expressions) < num_variations and attempts < max_attempts:
             modified_expression = expression
             for match in matches:
-                num = float(match)
-                variation = num + random.uniform(-0.3 * num, 0.3 * num)
-                variation_str = (
-                    f"{variation:.2f}" if "." in match else str(int(variation))
-                )
-                modified_expression = re.sub(
-                    re.escape(match), variation_str, modified_expression, count=1
-                )
+                try:
+                    num = float(match)
+                    # Increase variation range if needed
+                    variation = num + random.uniform(-0.5 * abs(num), 0.5 * abs(num))
+                    # Handle integer and float representations
+                    if "." in match:
+                        variation_str = f"{variation:.2f}"
+                    else:
+                        variation_str = str(int(round(variation)))
+                    # Replace only the first occurrence to handle multiple numbers correctly
+                    modified_expression = re.sub(
+                        re.escape(match), variation_str, modified_expression, count=1
+                    )
+                except ValueError:
+                    # If conversion fails, skip this number
+                    continue
             if modified_expression != expression:
                 modified_expressions.add(modified_expression)
+            attempts += 1  # Increment attempts each time through the loop
         return list(modified_expressions)
 
     # Generate distractors based on correct answer
     if correct_answer.replace(".", "", 1).replace("-", "", 1).isdigit():
-        correct_num = float(correct_answer)
+        try:
+            correct_num = float(correct_answer)
+        except ValueError:
+            correct_num = 0.0  # Fallback in case of unexpected format
         percentage = 0.2
-        while len(distractors) < (num_options - 1):
+        while len(distractors) < (num_options - 1) and attempts < max_attempts:
             variation = correct_num + random.uniform(
-                -percentage * correct_num, percentage * correct_num
+                -percentage * abs(correct_num), percentage * abs(correct_num)
             )
-            distractors.add(
-                str(int(variation)) if "." not in correct_answer else f"{variation:.2f}"
+            # Ensure variation is not equal to correct answer and is plausible
+            if variation == correct_num:
+                continue
+            distractor = (
+                str(int(variation)) if correct_answer.isdigit() else f"{variation:.2f}"
             )
+            distractors.add(distractor)
+            attempts += 1  # Increment attempts for each distractor generated
+        # If not enough distractors, fill with random plausible numbers
+        while len(distractors) < (num_options - 1):
+            variation = correct_num + random.randint(-5, 5)
+            if variation != correct_num:
+                distractors.add(str(int(variation)))
     else:
-        distractors = set(modify_numbers_in_expression(correct_answer, num_options - 1))
+        modified = modify_numbers_in_expression(correct_answer, num_options - 1)
+        distractors.update(modified)
+        # If not enough distractors, fill with generic incorrect answers
+        while len(distractors) < (num_options - 1) and attempts < max_attempts:
+            fake_answer = f"{correct_answer} (Incorrect)"
+            distractors.add(fake_answer)
+            attempts += 1
 
     options.extend(distractors)
+    # If still not enough, append generic placeholders
+    while len(options) < num_options:
+        options.append("N/A")
+
     random.shuffle(options)
     return options
 
